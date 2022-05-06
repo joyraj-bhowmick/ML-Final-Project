@@ -1,4 +1,2 @@
-# ML-Final-Project
-
-# What is the next best song?
+# ML-Final-Project: What is the next best song?
 
