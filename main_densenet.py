@@ -17,14 +17,12 @@ class TwoLayerDenseNet(torch.nn.Module):
         self.hiddenLayerWidth = hidden_layer_width
         self.nClasses = n_classes
 
-        self.linear1 = torch.nn.Linear(self.inputShape, self.hiddenLayerWidth)
-        self.activation = torch.nn.ReLU()
-        self.linear2 = torch.nn.Linear(self.hiddenLayerWidth, self.nClasses)
+        self.hidden = torch.nn.Linear(self.inputShape, self.hiddenLayerWidth)
+        self.predict = torch.nn.Linear(self.hiddenLayerWidth, 1)
 
     def forward(self, x):
-        x = self.linear1(x)
-        x = self.activation(x)
-        x = self.linear2(x)
+        x = F.relu(self.hidden(x))
+        x = self.predict(x)
         
         return (x)
 
@@ -33,7 +31,6 @@ if __name__ == "__main__":
     MODE = arguments.get('mode')
     DATA_DIR = arguments.get('data_dir')
     torch.set_printoptions(precision=8)
-    
     
     if MODE == "train":
         
@@ -60,50 +57,47 @@ if __name__ == "__main__":
         # Normalize data
         train_data = TRAIN_DATA.copy()
         train_data = (train_data-train_data.mean(axis=1).reshape(N_DATA,1))/train_data.std(axis=1).reshape(N_DATA,1)
+        train_labels = TRAIN_LABELS.copy()
+        train_labels = train_labels.reshape(N_DATA,1)
         dev_data = DEV_DATA.copy()
         dev_data = (dev_data-dev_data.mean(axis=1).reshape(N_DEV_DATA,1))/dev_data.std(axis=1).reshape(N_DEV_DATA,1)
+        dev_labels = DEV_LABELS.copy()
+        dev_labels = dev_labels.reshape(N_DEV_DATA,1)
         
-        # do not touch the following 4 lines (these write logging model performance to an output file 
-        # stored in LOG_DIR with the prefix being the time the model was trained.)
         LOGFILE = open(os.path.join(LOG_DIR, f"densenet.log"),'w')
-        log_fieldnames = ['step', 'train_loss', 'train_acc', 'dev_loss', 'dev_acc']
+        log_fieldnames = ['step', 'train_loss']
         logger = csv.DictWriter(LOGFILE, log_fieldnames)
         logger.writeheader()
         
-        model = TwoLayerDenseNet(N_FEATURES, 100, N_CLASSES)
+        model = TwoLayerDenseNet(N_FEATURES, 30, N_CLASSES)
                 
         optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
 
-        #print(train_data.shape, dev_data.shape)
-        #print(TRAIN_LABELS.shape, DEV_LABELS.shape)
+        loss_func = torch.nn.MSELoss()
         
         for step in range(EPOCHS):
             i = np.random.choice(train_data.shape[0], size=BATCH_SIZE, replace=False)
             x = torch.from_numpy(train_data[i].astype(np.float32))
-            y = torch.from_numpy(TRAIN_LABELS[i].astype(int))
+            y = torch.from_numpy(train_labels[i].astype(np.float32))
             
-            # Forward pass: Get logits for x
-            logits = model(x)
+            # Forward pass: Get prediction
+            prediction = model(x)
             # Compute loss
-            loss = F.cross_entropy(logits, y)
+            loss = loss_func(prediction, y)
             # Zero gradients, perform a backward pass, and update the weights.
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             
             if step % 100 == 0:
-                #print(logits, logits.size())
-                train_acc, train_loss = approx_train_acc_and_loss(model, train_data, TRAIN_LABELS)
-                dev_acc, dev_loss = dev_acc_and_loss(model, dev_data, DEV_LABELS)
+                #train_acc, train_loss = approx_train_acc_and_loss(model, train_data, TRAIN_LABELS)
+                #dev_acc, dev_loss = dev_acc_and_loss(model, dev_data, DEV_LABELS)
                 step_metrics = {
                     'step': step, 
                     'train_loss': loss.item(), 
-                    'train_acc': train_acc,
-                    'dev_loss': dev_loss,
-                    'dev_acc': dev_acc
                 }
 
-                print(f"On step {step}:\tTrain loss {train_loss}\t|\tDev acc is {dev_acc}")
+                print(f"On step {step}:\tTrain loss {loss.item()}")
                 logger.writerow(step_metrics)
         LOGFILE.close()
         
@@ -131,14 +125,10 @@ if __name__ == "__main__":
         
         for test_case in test_data:       
             x = torch.from_numpy(test_case.astype(np.float32))
-            #x = x.view(1,-1)
-            logits = model(x)
-            logits = torch.unsqueeze(logits, dim=0)
-            #print(logits, logits.size())
-            pred = torch.max(logits, 1)[1]
+            pred = model(x)
             predictions.append(pred.item())
         print(f"Storing predictions in {PREDICTIONS_FILE}")
         predictions = np.array(predictions)
-        np.savetxt(PREDICTIONS_FILE, predictions, fmt="%d")
+        np.savetxt(PREDICTIONS_FILE, predictions, fmt="%f")
         
     else: raise Exception("Mode not recognized")
