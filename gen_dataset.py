@@ -34,11 +34,13 @@ if __name__ == "__main__":
         playlistNumbers[i] = int(tempList[1])
 
     DEC = rawData['dance_energy_corr'].to_numpy()
+    uniqueDEC = rawData['dance_energy_corr'].unique()
+    np.save('unique_decs', uniqueDEC)
 
     #save features and labels
     np.save('datasets/traindata', features)
-    np.save('datasets/trainlabels', playlistNumbers)
-    #np.save('datasets/trainlabels', DEC)
+    #np.save('datasets/trainlabels', playlistNumbers)
+    np.save('datasets/trainlabels', DEC)
 
     #create dictionary
     uniquePlaylists = rawData['playlist_pid'].unique()
@@ -86,8 +88,8 @@ if __name__ == "__main__":
 
     #save features and labels
     np.save('datasets/devdata', features)
-    np.save('datasets/devlabels', playlistNumbers)
-    #np.save('datasets/devlabels', DEC)
+    #np.save('datasets/devlabels', playlistNumbers)
+    np.save('datasets/devlabels', DEC)
 
 
 
@@ -137,5 +139,5 @@ if __name__ == "__main__":
 
     #save features and labels
     np.save('datasets/testdata', features)
-    np.save('datasets/testlabels', playlistNumbers)
-    #np.save('datasets/testlabels', DEC)
+    #np.save('datasets/testlabels', playlistNumbers)
+    np.save('datasets/testlabels', DEC)
