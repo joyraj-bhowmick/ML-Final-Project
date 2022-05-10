@@ -36,8 +36,27 @@ if __name__ == "__main__":
     DEC = rawData['dance_energy_corr'].to_numpy()
 
     #save features and labels
-    np.save('datasets/traindata', features)
-    np.save('datasets/trainlabels', playlistNumbers)
+    import pdb
+    # pdb.set_trace()
+    counts = np.array([np.count_nonzero(np.array(playlistNumbers)==x) for x in set(playlistNumbers)])
+    min_count = min(counts)
+
+    equal_features = []
+    equal_numbers = []
+    for i in set(playlistNumbers):
+        playlistIndices = np.where(playlistNumbers == i)
+        randInds = np.random.choice(playlistIndices[0], size=min_count, replace=False)
+        playlistNewInds = playlistNumbers[randInds]
+        equal_numbers.extend(playlistNewInds)
+        playlistNewData = features[randInds,:]
+        # playlistNewData = playlistNewData.reshape(playlistNewData.shape[1], playlistNewData.shape[2])
+        equal_features.extend(playlistNewData)
+
+    # np.save('datasets/traindata', features)
+    # np.save('datasets/trainlabels', playlistNumbers)
+    np.save('datasets/traindataequal', equal_features)
+    np.save('datasets/trainlabelsequal', equal_numbers)
+
     #np.save('datasets/trainlabels', DEC)
 
     #create dictionary

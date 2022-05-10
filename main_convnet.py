@@ -59,15 +59,20 @@ if __name__ == "__main__":
         if LEARNING_RATE is None: raise TypeError("Learning rate has to be provided for train mode")
         if BATCH_SIZE is None: raise TypeError("batch size has to be provided for train mode")
         if EPOCHS is None: raise TypeError("number of epochs has to be provided for train mode")
-        TRAIN_IMAGES = np.load(os.path.join(DATA_DIR, "fruit_images.npy"))
-        TRAIN_LABELS = np.load(os.path.join(DATA_DIR, "fruit_labels.npy"))
-        DEV_IMAGES = np.load(os.path.join(DATA_DIR, "fruit_dev_images.npy"))
-        DEV_LABELS = np.load(os.path.join(DATA_DIR, "fruit_dev_labels.npy"))
-        
+        # TRAIN_IMAGES = np.load(os.path.join(DATA_DIR, "fruit_images.npy"))
+        # TRAIN_LABELS = np.load(os.path.join(DATA_DIR, "fruit_labels.npy"))
+        # DEV_IMAGES = np.load(os.path.join(DATA_DIR, "fruit_dev_images.npy"))
+        # DEV_LABELS = np.load(os.path.join(DATA_DIR, "fruit_dev_labels.npy"))
+        TRAIN_DATA = np.load("datasets/traindata.npy")
+        TRAIN_LABELS = np.load("datasets/trainlabels.npy")
+        # Validation data
+        DEV_DATA = np.load("datasets/devdata.npy")
+        DEV_LABELS = np.load("datasets/devlabels.npy")
         ### TODO get the following parameters and name them accordingly: 
         # [N_IMAGES] Number of images in the training corpus 
         # [HEIGHT] Height and [WIDTH] width dimensions of each image
         # [N_CLASSES] number of output classes
+        print("TRAIN_DATA.shape", TRAIN_DATA.shape)
         (N_IMAGES, WIDTH, HEIGHT) = TRAIN_IMAGES.shape
         N_CLASSES = 6
         N_DEV_IMGS = DEV_IMAGES.shape[0]

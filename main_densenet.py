@@ -5,9 +5,12 @@ import os
 import numpy as np
 import datetime
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from utils.io_argparse import get_args
-from utils.accuracies import (dev_acc_and_loss, accuracy, approx_train_acc_and_loss)
+from utils.accuracies import (dev_acc_and_loss, accuracy, approx_train_acc_and_loss, get_all_metrics)
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
 
 
 class TwoLayerDenseNet(torch.nn.Module):
@@ -18,14 +21,36 @@ class TwoLayerDenseNet(torch.nn.Module):
         self.nClasses = n_classes
 
         self.linear1 = torch.nn.Linear(self.inputShape, self.hiddenLayerWidth)
-        self.activation = torch.nn.ReLU()
-        self.linear2 = torch.nn.Linear(self.hiddenLayerWidth, self.nClasses)
+        self.dropout = torch.nn.Dropout(p = 0.1)
+        self.linear2 = torch.nn.Linear(self.hiddenLayerWidth, 24)
+        self.linear3 = torch.nn.Linear(24, 48)
+        self.linear4 = torch.nn.Linear(48, 96)
+        self.linear5 = torch.nn.Linear(96, self.nClasses)
+    
+        # self.layer1 = torch.nn.Linear(self.inputShape, self.hiddenLayerWidth)
+        # self.layer2 = torch.nn.Linear(self.hiddenLayerWidth, self.hiddenLayerWidth*2)
+        # self.layer3 = torch.nn.Linear(self.hiddenLayerWidth, self.nClasses)
 
     def forward(self, x):
         x = self.linear1(x)
-        x = self.activation(x)
+        x = F.relu(x)
+        x = self.dropout(x)
         x = self.linear2(x)
-        
+        x = F.relu(x)
+        x = self.dropout(x)
+        x = self.linear3(x)
+        x = F.relu(x)
+        x = self.linear4(x)
+        x = F.tanh(x)
+        x = self.linear5(x)
+        x = F.softmax(x)
+
+        # x = self.layer1(x)
+        # x = F.leaky_relu(x)
+        # # x = self.layer2(x)
+        # # x = F.leaky_relu(x)
+        # x = self.layer3(x)
+        # x = F.softmax(x)
         return (x)
 
 if __name__ == "__main__":
@@ -50,9 +75,14 @@ if __name__ == "__main__":
         # Training data
         TRAIN_DATA = np.load("datasets/traindata.npy")
         TRAIN_LABELS = np.load("datasets/trainlabels.npy")
-        # Validation data
-        DEV_DATA = np.load("datasets/devdata.npy")
-        DEV_LABELS = np.load("datasets/devlabels.npy")
+
+        import pdb
+        # pdb.set_trace()
+        counts = np.array([np.count_nonzero(np.array(TRAIN_LABELS)==x) for x in set(TRAIN_LABELS)])
+        weights = sum(counts)/(100*counts)
+        weights_torch = torch.from_numpy(weights).float()
+        TRAIN_DATA, DEV_DATA, TRAIN_LABELS, DEV_LABELS = train_test_split(TRAIN_DATA, list(TRAIN_LABELS), test_size=0.05, random_state=2)
+
         # Constants
         (N_DATA, N_FEATURES) = TRAIN_DATA.shape
         N_CLASSES = 100
@@ -62,7 +92,8 @@ if __name__ == "__main__":
         train_data = (train_data-train_data.mean(axis=1).reshape(N_DATA,1))/train_data.std(axis=1).reshape(N_DATA,1)
         dev_data = DEV_DATA.copy()
         dev_data = (dev_data-dev_data.mean(axis=1).reshape(N_DEV_DATA,1))/dev_data.std(axis=1).reshape(N_DEV_DATA,1)
-        
+
+
         # do not touch the following 4 lines (these write logging model performance to an output file 
         # stored in LOG_DIR with the prefix being the time the model was trained.)
         LOGFILE = open(os.path.join(LOG_DIR, f"densenet.log"),'w')
@@ -76,25 +107,43 @@ if __name__ == "__main__":
 
         #print(train_data.shape, dev_data.shape)
         #print(TRAIN_LABELS.shape, DEV_LABELS.shape)
+
+        step_list = []
+        train_loss_list = []
+        dev_acc_list = []
+        r_list = []
+        ndcg_list = []
         
         for step in range(EPOCHS):
+            # pdb.set_trace()
             i = np.random.choice(train_data.shape[0], size=BATCH_SIZE, replace=False)
             x = torch.from_numpy(train_data[i].astype(np.float32))
-            y = torch.from_numpy(TRAIN_LABELS[i].astype(int))
-            
-            # Forward pass: Get logits for x
+            y = torch.from_numpy(np.array(TRAIN_LABELS)[i].astype(int))
+
+             # Forward pass: Get logits for x
             logits = model(x)
             # Compute loss
-            loss = F.cross_entropy(logits, y)
+            loss = F.cross_entropy(logits, y, weight=weights_torch)
             # Zero gradients, perform a backward pass, and update the weights.
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             
+            
             if step % 100 == 0:
-                #print(logits, logits.size())
-                train_acc, train_loss = approx_train_acc_and_loss(model, train_data, TRAIN_LABELS)
-                dev_acc, dev_loss = dev_acc_and_loss(model, dev_data, DEV_LABELS)
+                # print(logits, logits.size())
+                import pdb
+                # pdb.set_trace()
+                train_acc, train_loss = approx_train_acc_and_loss(model, train_data, TRAIN_LABELS, weights_torch)
+                dev_acc, dev_loss = dev_acc_and_loss(model, dev_data, DEV_LABELS, weights_torch)
+                r_squared, ndcg = get_all_metrics(model, dev_data, DEV_LABELS, weights_torch)
+
+                step_list.append(step)
+                train_loss_list.append(train_loss)
+                dev_acc_list.append(dev_acc)
+                r_list.append(r_squared)
+                ndcg_list.append(r_list)
+
                 step_metrics = {
                     'step': step, 
                     'train_loss': loss.item(), 
@@ -108,8 +157,30 @@ if __name__ == "__main__":
         LOGFILE.close()
         
         model_savepath = os.path.join(MODEL_SAVE_DIR,f"densenet.pt")
-        
-        print("Training completed, saving model at {model_savepath}")
+
+        plt.plot(step_list, r_list)
+        plt.xlabel('Steps')
+        plt.ylabel('R Squared')
+        plt.savefig("r_squared")
+        print("r_squared: {0}".format(r_list))
+
+        plt.plot(step_list, ndcg_list)
+        plt.xlabel('Steps')
+        plt.ylabel('NDGC')
+        plt.savefig("ndcg")
+        print("ndcg_list: {0}".format(ndcg_list))
+
+        plt.plot(step_list, train_loss_list)
+        plt.xlabel('Steps')
+        plt.ylabel('Training Loss')
+        plt.savefig("training_loss")
+
+        plt.plot(step_list, dev_acc_list)
+        plt.xlabel('Steps')
+        plt.ylabel('Dev Accuracy')
+        plt.savefig("dev_accuracy")
+
+        print("Training completed, saving model at {0}".format(model_savepath))
         torch.save(model, model_savepath)
         
         
