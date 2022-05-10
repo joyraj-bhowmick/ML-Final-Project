@@ -49,10 +49,12 @@ if __name__ == "__main__":
         playlistDict[i] = uniquePlaylists[i]
 
     #save dictionary
+    '''
     json = json.dumps(playlistDict)
     f = open("playlistDict.json","w")
     f.write(json)
     f.close()
+    '''
 
 
 
@@ -108,7 +110,7 @@ if __name__ == "__main__":
     #print(indexList)
     df = rawData.iloc[indexList,:]
     #df = df.reset_index()
-    print(df)
+    #print(df)
     df.to_csv('datasets/testdata.tsv', sep="\t")
 
     #features
